@@ -1,27 +1,18 @@
-import mongoose, { Schema, Document } from "mongoose";
+import { pgTable, text, timestamp, serial } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
-export interface IUser extends Document {
-  _id: mongoose.Types.ObjectId;
-  username: string;
-  password: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
-const userSchema = new Schema<IUser>(
-  {
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-  },
-  { timestamps: true }
-);
-
-export const User = mongoose.models.User || mongoose.model<IUser>("User", userSchema);
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
 
 export const insertUserSchema = z.object({
   username: z.string().min(3).max(30),
   password: z.string().min(6),
 });
-
-export type InsertUser = z.infer<typeof insertUserSchema>;

@@ -1,7 +1,8 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { type Server } from "http";
 import session from "express-session";
-import MongoStore from "connect-mongo";
+import connectPgSimple from "connect-pg-simple";
+import pg from "pg";
 import { storage } from "./storage";
 import { z } from "zod";
 
@@ -33,24 +34,28 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  const MONGODB_URI = process.env.MONGODB_URI;
-  if (!MONGODB_URI) {
-    throw new Error("MONGODB_URI environment variable is not set");
+  const DATABASE_URL = process.env.DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error("DATABASE_URL environment variable is not set");
   }
 
-  const SESSION_SECRET = process.env.SESSION_SECRET;
-  if (!SESSION_SECRET) {
-    throw new Error("SESSION_SECRET environment variable is not set");
-  }
+  const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret-change-in-production";
+
+  const PgSession = connectPgSimple(session);
+  const pgPool = new pg.Pool({
+    connectionString: DATABASE_URL,
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  });
 
   app.use(
     session({
       secret: SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
-      store: MongoStore.create({
-        mongoUrl: MONGODB_URI,
-        collectionName: "sessions",
+      store: new PgSession({
+        pool: pgPool,
+        tableName: "session",
+        createTableIfMissing: true,
       }),
       cookie: {
         secure: process.env.NODE_ENV === "production",
