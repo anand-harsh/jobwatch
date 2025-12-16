@@ -23,21 +23,20 @@ Preferred communication style: Simple, everyday language.
 - **Runtime**: Node.js with Express
 - **Language**: TypeScript with tsx for development execution
 - **API Pattern**: RESTful JSON APIs under `/api` prefix
-- **Session Management**: express-session with MongoDB store (connect-mongo)
+- **Session Management**: express-session with PostgreSQL store (connect-pg-simple)
 
 ### Authentication
 - **Strategy**: Session-based authentication with cookies
 - **Password Hashing**: bcryptjs
-- **Session Storage**: MongoDB via connect-mongo
+- **Session Storage**: PostgreSQL via connect-pg-simple
 - **Protected Routes**: Custom `requireAuth` middleware checks `req.session.userId`
 
 ### Data Storage
-- **Primary Database**: MongoDB via Mongoose ODM
-- **Schema Definition**: Mongoose models in `server/models/`
-- **Connection**: Requires `MONGODB_URI` environment variable
+- **Primary Database**: PostgreSQL (Replit-native database)
+- **ORM**: Drizzle ORM for type-safe database queries
+- **Schema Definition**: Drizzle schema in `shared/schema.ts`
+- **Connection**: Uses `DATABASE_URL` environment variable (automatically provided by Replit)
 - **Client-side Persistence**: localStorage for job application data (mock data approach currently)
-
-Note: The repository contains Drizzle ORM configuration for PostgreSQL (`drizzle.config.ts`, `shared/schema.ts`), but the actual implementation uses MongoDB. The Drizzle schema serves as a reference or future migration path.
 
 ### Build Configuration
 - **Development**: `npm run dev` runs the Express server with Vite middleware for HMR
@@ -53,27 +52,30 @@ client/           # React frontend
     lib/          # Utilities, auth context, storage helpers
     hooks/        # Custom React hooks
 server/           # Express backend
-  models/         # Mongoose models
   routes.ts       # API route definitions
-  storage.ts      # Data access layer abstraction
-  db.ts           # MongoDB connection
-shared/           # Shared types/schemas (Drizzle schemas present but MongoDB used)
+  storage.ts      # Data access layer with PostgresStorage implementation
+  db.ts           # PostgreSQL connection and Drizzle setup
+shared/           # Shared types/schemas
+  schema.ts       # Drizzle ORM schema definitions
 ```
 
 ## External Dependencies
 
 ### Database
-- **MongoDB**: Primary database, connection via `MONGODB_URI` environment variable
+- **PostgreSQL**: Replit-native PostgreSQL database (Neon-backed)
+- **Connection**: Automatically provided via `DATABASE_URL` environment variable
 
 ### Environment Variables Required
-- `MONGODB_URI`: MongoDB connection string
+- `DATABASE_URL`: PostgreSQL connection string (auto-provisioned by Replit)
 - `SESSION_SECRET`: Secret key for session encryption
+- `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`: Auto-provisioned database credentials
 
 ### Key NPM Packages
 - **UI**: @radix-ui/* primitives, @tanstack/react-table, lucide-react icons
-- **Backend**: express, express-session, connect-mongo, mongoose, bcryptjs
+- **Backend**: express, express-session, connect-pg-simple, pg, drizzle-orm, bcryptjs
 - **Validation**: zod for request validation
 - **Date Handling**: date-fns
+- **Database**: drizzle-orm with node-postgres driver
 
 ### Replit-Specific Plugins
 - `@replit/vite-plugin-runtime-error-modal`: Development error overlay

@@ -1,9 +1,12 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { type Server } from "http";
 import session from "express-session";
-import MongoStore from "connect-mongo";
+import connectPgSimple from "connect-pg-simple";
+import pg from "pg";
 import { storage } from "./storage";
 import { z } from "zod";
+
+const PgSession = connectPgSimple(session);
 
 declare module "express-session" {
   interface SessionData {
@@ -33,9 +36,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  const MONGODB_URI = process.env.MONGODB_URI;
-  if (!MONGODB_URI) {
-    throw new Error("MONGODB_URI environment variable is not set");
+  const DATABASE_URL = process.env.DATABASE_URL;
+  if (!DATABASE_URL) {
+    throw new Error("DATABASE_URL environment variable is not set");
   }
 
   const SESSION_SECRET = process.env.SESSION_SECRET;
@@ -43,14 +46,19 @@ export async function registerRoutes(
     throw new Error("SESSION_SECRET environment variable is not set");
   }
 
+  const pgPool = new pg.Pool({
+    connectionString: DATABASE_URL,
+  });
+
   app.use(
     session({
       secret: SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
-      store: MongoStore.create({
-        mongoUrl: MONGODB_URI,
-        collectionName: "sessions",
+      store: new PgSession({
+        pool: pgPool,
+        tableName: "session",
+        createTableIfMissing: true,
       }),
       cookie: {
         secure: process.env.NODE_ENV === "production",
@@ -77,12 +85,12 @@ export async function registerRoutes(
 
       const user = await storage.createUser(username, password);
 
-      req.session.userId = user._id.toString();
+      req.session.userId = user.id;
       req.session.username = user.username;
 
       res.status(201).json({
         message: "User registered successfully",
-        user: { id: user._id, username: user.username },
+        user: { id: user.id, username: user.username },
       });
     } catch (error) {
       console.error("Registration error:", error);
@@ -109,12 +117,12 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      req.session.userId = user._id.toString();
+      req.session.userId = user.id;
       req.session.username = user.username;
 
       res.json({
         message: "Login successful",
-        user: { id: user._id, username: user.username },
+        user: { id: user.id, username: user.username },
       });
     } catch (error) {
       console.error("Login error:", error);
