@@ -23,19 +23,19 @@ Preferred communication style: Simple, everyday language.
 - **Runtime**: Node.js with Express
 - **Language**: TypeScript with tsx for development execution
 - **API Pattern**: RESTful JSON APIs under `/api` prefix
-- **Session Management**: express-session with PostgreSQL store (connect-pg-simple)
+- **Session Management**: express-session with MongoDB store (connect-mongo)
 
 ### Authentication
 - **Strategy**: Session-based authentication with cookies
 - **Password Hashing**: bcryptjs
-- **Session Storage**: PostgreSQL via connect-pg-simple
+- **Session Storage**: MongoDB via connect-mongo
 - **Protected Routes**: Custom `requireAuth` middleware checks `req.session.userId`
 
 ### Data Storage
-- **Primary Database**: PostgreSQL (Replit-native database)
-- **ORM**: Drizzle ORM for type-safe database queries
-- **Schema Definition**: Drizzle schema in `shared/schema.ts`
-- **Connection**: Uses `DATABASE_URL` environment variable (automatically provided by Replit)
+- **Primary Database**: MongoDB (MongoDB Atlas)
+- **ODM**: Mongoose for schema definitions and queries
+- **Schema Definition**: Mongoose models in `shared/schema.ts`
+- **Connection**: Uses `MONGODB_URI` environment variable
 - **Client-side Persistence**: localStorage for job application data (mock data approach currently)
 
 ### Build Configuration
@@ -53,29 +53,27 @@ client/           # React frontend
     hooks/        # Custom React hooks
 server/           # Express backend
   routes.ts       # API route definitions
-  storage.ts      # Data access layer with PostgresStorage implementation
-  db.ts           # PostgreSQL connection and Drizzle setup
+  storage.ts      # Data access layer with MongoStorage implementation
+  db.ts           # MongoDB connection setup
 shared/           # Shared types/schemas
-  schema.ts       # Drizzle ORM schema definitions
+  schema.ts       # Mongoose model definitions
 ```
 
 ## External Dependencies
 
 ### Database
-- **PostgreSQL**: Replit-native PostgreSQL database (Neon-backed)
-- **Connection**: Automatically provided via `DATABASE_URL` environment variable
+- **MongoDB**: MongoDB Atlas cloud database
+- **Connection**: Configured via `MONGODB_URI` environment variable
 
 ### Environment Variables Required
-- `DATABASE_URL`: PostgreSQL connection string (auto-provisioned by Replit)
+- `MONGODB_URI`: MongoDB connection string (e.g., mongodb+srv://user:pass@cluster.mongodb.net/dbname)
 - `SESSION_SECRET`: Secret key for session encryption
-- `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`: Auto-provisioned database credentials
 
 ### Key NPM Packages
 - **UI**: @radix-ui/* primitives, @tanstack/react-table, lucide-react icons
-- **Backend**: express, express-session, connect-pg-simple, pg, drizzle-orm, bcryptjs
+- **Backend**: express, express-session, connect-mongo, mongoose, bcryptjs
 - **Validation**: zod for request validation
 - **Date Handling**: date-fns
-- **Database**: drizzle-orm with node-postgres driver
 
 ### Replit-Specific Plugins
 - `@replit/vite-plugin-runtime-error-modal`: Development error overlay
@@ -91,7 +89,7 @@ The project is configured for Vercel deployment:
 - **Configuration**: See `vercel.json` for routing and build settings
 
 #### Required Vercel Environment Variables
-- `DATABASE_URL`: PostgreSQL connection string
+- `MONGODB_URI`: MongoDB connection string
 - `SESSION_SECRET`: Secret key for session encryption
 
 #### Deployment Steps

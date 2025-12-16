@@ -4,7 +4,6 @@ import bcrypt from "bcryptjs";
 export interface UserWithMethods {
   id: string;
   username: string;
-  password: string;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -18,14 +17,14 @@ export interface IStorage {
 
 export class MongoStorage implements IStorage {
   private addMethods(user: IUser): UserWithMethods {
+    const hashedPassword = user.password;
     return {
       id: user._id.toString(),
       username: user.username,
-      password: user.password,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       comparePassword: async (candidatePassword: string) => {
-        return bcrypt.compare(candidatePassword, user.password);
+        return bcrypt.compare(candidatePassword, hashedPassword);
       },
     };
   }

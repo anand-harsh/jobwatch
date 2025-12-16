@@ -4,8 +4,6 @@ import MongoStore from "connect-mongo";
 import mongoose from "mongoose";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import path from "path";
-import fs from "fs";
 
 const userSchema = new mongoose.Schema(
   {
@@ -43,8 +41,16 @@ let isConnected = false;
 
 async function connectDB() {
   if (isConnected) return;
-  await mongoose.connect(MONGODB_URI!);
-  isConnected = true;
+  try {
+    await mongoose.connect(MONGODB_URI!, {
+      serverSelectionTimeoutMS: 5000,
+      retryWrites: true,
+    });
+    isConnected = true;
+  } catch (error) {
+    console.error("MongoDB connection error:", error);
+    throw error;
+  }
 }
 
 app.use(
@@ -55,6 +61,7 @@ app.use(
     store: MongoStore.create({
       mongoUrl: MONGODB_URI,
       collectionName: "sessions",
+      ttl: 60 * 60 * 24 * 7,
     }),
     cookie: {
       secure: process.env.NODE_ENV === "production",
@@ -68,17 +75,16 @@ app.use(
 interface UserWithMethods {
   id: string;
   username: string;
-  password: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
 function addMethods(user: any): UserWithMethods {
+  const hashedPassword = user.password;
   return {
     id: user._id.toString(),
     username: user.username,
-    password: user.password,
     comparePassword: async (candidatePassword: string) => {
-      return bcrypt.compare(candidatePassword, user.password);
+      return bcrypt.compare(candidatePassword, hashedPassword);
     },
   };
 }
