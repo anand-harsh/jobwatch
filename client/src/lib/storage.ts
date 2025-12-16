@@ -31,5 +31,12 @@ export const storage = {
     );
     storage.saveJobs(newJobs);
     return newJobs;
+  },
+
+  deleteJobs: (ids: string[]) => {
+    const jobs = storage.getJobs();
+    const newJobs = jobs.filter((job) => !ids.includes(job.id));
+    storage.saveJobs(newJobs);
+    return newJobs;
   }
 };

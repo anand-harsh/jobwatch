@@ -63,6 +63,50 @@ export default function Home() {
     });
   };
 
+  const handleDeleteJobs = (ids: string[]) => {
+    const updatedJobs = storage.deleteJobs(ids);
+    setJobs(updatedJobs);
+    
+    toast({
+      title: "Deleted",
+      description: `Successfully removed ${ids.length} application(s).`,
+      variant: "destructive",
+    });
+  };
+
+  const handleExportCSV = () => {
+    // Define headers
+    const headers = ["Company", "Role", "Category", "Date Applied", "Status", "Notes"];
+    
+    // Convert jobs to CSV rows
+    const csvRows = [
+      headers.join(","), // Header row
+      ...jobs.map(job => {
+        const row = [
+          `"${job.company}"`, // Quote strings to handle commas
+          `"${job.role}"`,
+          `"${job.category}"`,
+          `"${job.dateApplied}"`,
+          `"${job.status}"`,
+          `"${job.notes || ""}"`
+        ];
+        return row.join(",");
+      })
+    ];
+    
+    // Create blob and download link
+    const csvString = csvRows.join("\n");
+    const blob = new Blob([csvString], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.setAttribute("hidden", "");
+    a.setAttribute("href", url);
+    a.setAttribute("download", `job-tracker-export-${format(new Date(), "yyyy-MM-dd")}.csv`);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   // Calculate stats
   const totalApplied = jobs.length;
   const interviews = jobs.filter(j => 
@@ -191,7 +235,13 @@ export default function Home() {
               </div>
             </div>
             
-            <JobTable data={jobs} onUpdateJob={handleUpdateJob} onAddJob={handleAddJob} />
+            <JobTable 
+              data={jobs} 
+              onUpdateJob={handleUpdateJob} 
+              onAddJob={handleAddJob}
+              onDeleteJobs={handleDeleteJobs}
+              onExportCSV={handleExportCSV}
+            />
           </div>
 
           {/* Sidebar Section */}

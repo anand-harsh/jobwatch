@@ -21,8 +21,9 @@ import { JobApplication, JobStatus } from "@/lib/mock-data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
-import { ArrowUpDown, Search, Filter, Plus, ChevronDown } from "lucide-react";
+import { ArrowUpDown, Search, Filter, Plus, ChevronDown, Trash2, Download } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -57,15 +58,38 @@ interface JobTableProps {
   data: JobApplication[];
   onUpdateJob: (id: string, field: keyof JobApplication, value: any) => void;
   onAddJob: () => void;
+  onDeleteJobs: (ids: string[]) => void;
+  onExportCSV: () => void;
 }
 
-export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
+export function JobTable({ data, onUpdateJob, onAddJob, onDeleteJobs, onExportCSV }: JobTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState({});
   const [pageSize, setPageSize] = useState(10);
 
   const columns: ColumnDef<JobApplication>[] = [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className="translate-y-[2px]"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className="translate-y-[2px]"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       accessorKey: "company",
       header: ({ column }) => {
@@ -209,6 +233,19 @@ export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
         />
       ),
     },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors"
+          onClick={() => onDeleteJobs([row.original.id])}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      ),
+    }
   ];
 
   const table = useReactTable({
@@ -244,6 +281,8 @@ export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
     table.setPageSize(size === -1 ? data.length : size);
   };
 
+  const selectedCount = Object.keys(rowSelection).length;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
@@ -260,16 +299,39 @@ export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
         </div>
         
         <div className="flex items-center gap-2">
-          <Button onClick={onAddJob} className="bg-primary text-primary-foreground hover:bg-primary/90">
+          {selectedCount > 0 && (
+            <Button 
+              variant="destructive" 
+              size="sm"
+              onClick={() => {
+                const selectedIds = table.getSelectedRowModel().rows.map(row => row.original.id);
+                onDeleteJobs(selectedIds);
+                setRowSelection({});
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete ({selectedCount})
+            </Button>
+          )}
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={onExportCSV}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+
+          <Button onClick={onAddJob} className="bg-primary text-primary-foreground hover:bg-primary/90" size="sm">
             <Plus className="mr-2 h-4 w-4" />
-            Add Application
+            Add New
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="ml-auto">
-                <Filter className="mr-2 h-4 w-4" />
-                Filter Status
+              <Button variant="outline" size="icon" className="h-9 w-9">
+                <Filter className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
