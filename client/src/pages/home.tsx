@@ -133,7 +133,7 @@ export default function Home() {
           <a href="#" className="text-muted-foreground transition-colors hover:text-primary">Applications</a>
           <div className="flex items-center gap-4 border-l pl-6 ml-2">
              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-               {user}
+               {user?.username}
              </span>
              <Button variant="ghost" size="sm" onClick={logout} className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive">
                <LogOut className="h-4 w-4" />
@@ -148,7 +148,7 @@ export default function Home() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-heading font-bold text-slate-900 dark:text-slate-50">
-              Welcome back, {user}!
+              Welcome back, {user?.username}!
             </h1>
             <p className="text-slate-500 dark:text-slate-400 mt-1">
               Here's what's happening with your job search today.

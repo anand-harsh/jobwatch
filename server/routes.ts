@@ -38,9 +38,14 @@ export async function registerRoutes(
     throw new Error("MONGODB_URI environment variable is not set");
   }
 
+  const SESSION_SECRET = process.env.SESSION_SECRET;
+  if (!SESSION_SECRET) {
+    throw new Error("SESSION_SECRET environment variable is not set");
+  }
+
   app.use(
     session({
-      secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
+      secret: SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
       store: MongoStore.create({
@@ -50,6 +55,7 @@ export async function registerRoutes(
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
+        sameSite: "lax",
         maxAge: 1000 * 60 * 60 * 24 * 7,
       },
     })
