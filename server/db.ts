@@ -1,27 +1,32 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
-import * as schema from "@shared/schema";
+import mongoose from "mongoose";
 
-const { Pool } = pg;
-
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
+if (!process.env.MONGODB_URI) {
+  throw new Error("MONGODB_URI environment variable is not set");
 }
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
-});
-
-export const db = drizzle(pool, { schema });
 
 export async function connectDB() {
   try {
-    const client = await pool.connect();
-    console.log("Connected to PostgreSQL");
-    client.release();
+    await mongoose.connect(process.env.MONGODB_URI!, {
+      serverSelectionTimeoutMS: 5000,
+      retryWrites: true,
+    });
+    console.log("Connected to MongoDB");
   } catch (error) {
-    console.error("PostgreSQL connection error:", error);
+    console.error("MongoDB connection error:", error);
     process.exit(1);
   }
 }
+
+mongoose.connection.on("error", (err) => {
+  console.error("MongoDB connection error:", err);
+});
+
+mongoose.connection.on("disconnected", () => {
+  console.warn("MongoDB disconnected. Attempting to reconnect...");
+});
+
+mongoose.connection.on("reconnected", () => {
+  console.log("MongoDB reconnected");
+});
+
+export { mongoose };

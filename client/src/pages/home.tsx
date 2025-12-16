@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { JobTable } from "@/components/job-table";
 import { JobApplication } from "@/lib/mock-data";
-import { storage } from "@/lib/storage";
+import { jobApi } from "@/lib/storage";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,73 +17,112 @@ import {
   Calendar,
   Building2,
   PieChart,
-  LogOut
+  LogOut,
+  Loader2
 } from "lucide-react";
 
 export default function Home() {
   const [jobs, setJobs] = useState<JobApplication[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user, logout } = useAuth();
 
   useEffect(() => {
-    // Load data from storage on mount
-    setJobs(storage.getJobs());
+    loadJobs();
   }, []);
 
-  const handleUpdateJob = (id: string, field: keyof JobApplication, value: any) => {
-    const updatedJobs = storage.updateJob(id, field, value);
-    setJobs(updatedJobs);
-    
-    // Only toast on status changes for less noise
-    if (field === 'status') {
+  const loadJobs = async () => {
+    try {
+      setLoading(true);
+      const data = await jobApi.getJobs();
+      setJobs(data);
+    } catch (error: any) {
       toast({
-        title: "Status Updated",
-        description: `Application status changed to ${value}`,
+        title: "Error",
+        description: error.message || "Failed to load jobs",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateJob = async (id: string, field: keyof JobApplication, value: any) => {
+    try {
+      const updatedJob = await jobApi.updateJob(id, { [field]: value });
+      setJobs(prevJobs => 
+        prevJobs.map(job => job.id === id ? { ...job, ...updatedJob } : job)
+      );
+      
+      if (field === 'status') {
+        toast({
+          title: "Status Updated",
+          description: `Application status changed to ${value}`,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update job",
+        variant: "destructive",
       });
     }
   };
 
-  const handleAddJob = () => {
-    const newJob: JobApplication = {
-      id: `job-new-${Date.now()}`,
-      company: "New Company",
-      role: "Software Engineer",
-      dateApplied: format(new Date(), "yyyy-MM-dd"),
-      status: "Applied",
-      notes: "",
-      category: "Startup"
-    };
+  const handleAddJob = async () => {
+    try {
+      const newJobData = {
+        company: "New Company",
+        role: "Software Engineer",
+        dateApplied: format(new Date(), "yyyy-MM-dd"),
+        status: "Applied" as const,
+        notes: "",
+        category: "Startup" as const
+      };
 
-    const updatedJobs = storage.addJob(newJob);
-    setJobs(updatedJobs);
-    
-    toast({
-      title: "Application Added",
-      description: "New job application added to the top of the list.",
-    });
+      const newJob = await jobApi.addJob(newJobData);
+      setJobs(prevJobs => [newJob, ...prevJobs]);
+      
+      toast({
+        title: "Application Added",
+        description: "New job application added to the top of the list.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add job",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteJobs = (ids: string[]) => {
-    const updatedJobs = storage.deleteJobs(ids);
-    setJobs(updatedJobs);
-    
-    toast({
-      title: "Deleted",
-      description: `Successfully removed ${ids.length} application(s).`,
-      variant: "destructive",
-    });
+  const handleDeleteJobs = async (ids: string[]) => {
+    try {
+      await jobApi.deleteJobs(ids);
+      setJobs(prevJobs => prevJobs.filter(job => !ids.includes(job.id)));
+      
+      toast({
+        title: "Deleted",
+        description: `Successfully removed ${ids.length} application(s).`,
+        variant: "destructive",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete jobs",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExportCSV = () => {
-    // Define headers
     const headers = ["Company", "Role", "Category", "Date Applied", "Status", "Notes"];
     
-    // Convert jobs to CSV rows
     const csvRows = [
-      headers.join(","), // Header row
+      headers.join(","),
       ...jobs.map(job => {
         const row = [
-          `"${job.company}"`, // Quote strings to handle commas
+          `"${job.company}"`,
           `"${job.role}"`,
           `"${job.category}"`,
           `"${job.dateApplied}"`,
@@ -94,7 +133,6 @@ export default function Home() {
       })
     ];
     
-    // Create blob and download link
     const csvString = csvRows.join("\n");
     const blob = new Blob([csvString], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
@@ -115,8 +153,24 @@ export default function Home() {
   const offers = jobs.filter(j => j.status === "Offer Received").length;
   const rejected = jobs.filter(j => j.status === "Rejected").length;
   
+  // Category distribution
+  const bigTechCount = jobs.filter(j => j.category === "Big Tech").length;
+  const startupCount = jobs.filter(j => j.category === "Startup").length;
+  const midTierCount = jobs.filter(j => j.category === "Mid-Tier").length;
+  const bigTechPercent = totalApplied > 0 ? Math.round((bigTechCount / totalApplied) * 100) : 0;
+  const startupPercent = totalApplied > 0 ? Math.round((startupCount / totalApplied) * 100) : 0;
+  const midTierPercent = totalApplied > 0 ? Math.round((midTierCount / totalApplied) * 100) : 0;
+  
   // Recent activity
   const recentActivity = jobs.slice(0, 4);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950">
@@ -174,7 +228,7 @@ export default function Home() {
             <CardContent>
               <div className="text-2xl font-bold">{totalApplied}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                +12% from last month
+                All time applications
               </p>
             </CardContent>
           </Card>
@@ -189,7 +243,7 @@ export default function Home() {
             <CardContent>
               <div className="text-2xl font-bold">{interviews}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                4 scheduled this week
+                Active interviews
               </p>
             </CardContent>
           </Card>
@@ -204,7 +258,7 @@ export default function Home() {
             <CardContent>
               <div className="text-2xl font-bold">{offers}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                1 pending decision
+                Offers received
               </p>
             </CardContent>
           </Card>
@@ -219,7 +273,7 @@ export default function Home() {
             <CardContent>
               <div className="text-2xl font-bold">{rejected}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Keep going! 💪
+                Keep going!
               </p>
             </CardContent>
           </Card>
@@ -253,22 +307,26 @@ export default function Home() {
                 <CardDescription>Latest changes to your applications</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  {recentActivity.map((job, i) => (
-                    <div key={job.id} className="flex items-start gap-4 group">
-                      <div className="mt-1 bg-slate-100 dark:bg-slate-800 p-2 rounded-full group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                        <Building2 className="h-4 w-4" />
+                {recentActivity.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No applications yet. Add your first one!</p>
+                ) : (
+                  <div className="space-y-6">
+                    {recentActivity.map((job) => (
+                      <div key={job.id} className="flex items-start gap-4 group">
+                        <div className="mt-1 bg-slate-100 dark:bg-slate-800 p-2 rounded-full group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                          <Building2 className="h-4 w-4" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium leading-none">{job.company}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Status: <span className="font-medium text-foreground">{job.status}</span>
+                          </p>
+                          <p className="text-xs text-slate-400">{job.dateApplied}</p>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none">{job.company}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Status updated to <span className="font-medium text-foreground">{job.status}</span>
-                        </p>
-                        <p className="text-xs text-slate-400">2 hours ago</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -284,36 +342,38 @@ export default function Home() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-300">Big Tech</span>
-                    <span className="font-medium">35%</span>
+                    <span className="font-medium">{bigTechPercent}%</span>
                   </div>
                   <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
-                    <div className="h-full bg-blue-500 w-[35%]" />
+                    <div className="h-full bg-blue-500" style={{ width: `${bigTechPercent}%` }} />
                   </div>
                 </div>
                 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-300">Startups</span>
-                    <span className="font-medium">45%</span>
+                    <span className="font-medium">{startupPercent}%</span>
                   </div>
                   <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
-                    <div className="h-full bg-emerald-500 w-[45%]" />
+                    <div className="h-full bg-emerald-500" style={{ width: `${startupPercent}%` }} />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-300">Mid-Tier</span>
-                    <span className="font-medium">20%</span>
+                    <span className="font-medium">{midTierPercent}%</span>
                   </div>
                   <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
-                    <div className="h-full bg-violet-500 w-[20%]" />
+                    <div className="h-full bg-violet-500" style={{ width: `${midTierPercent}%` }} />
                   </div>
                 </div>
                 
                 <div className="pt-4 mt-4 border-t border-slate-700">
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    You have a healthy mix of applications across different company types. Consider focusing more on referrals for Big Tech roles.
+                    {totalApplied === 0 
+                      ? "Start adding job applications to see your distribution insights."
+                      : "Track your application distribution across different company types."}
                   </p>
                 </div>
               </CardContent>

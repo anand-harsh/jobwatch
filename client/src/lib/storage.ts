@@ -1,42 +1,48 @@
-import { initialJobs, JobApplication } from "./mock-data";
+import { JobApplication } from "./mock-data";
 
-const STORAGE_KEY = "job_tracker_data";
+const API_BASE = "/api";
 
-export const storage = {
-  getJobs: (): JobApplication[] => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
-      // Initialize with mock data if empty
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialJobs));
-      return initialJobs;
-    }
-    return JSON.parse(stored);
-  },
-
-  saveJobs: (jobs: JobApplication[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
-  },
-
-  addJob: (job: JobApplication) => {
-    const jobs = storage.getJobs();
-    const newJobs = [job, ...jobs];
-    storage.saveJobs(newJobs);
-    return newJobs;
-  },
-
-  updateJob: (id: string, field: keyof JobApplication, value: any) => {
-    const jobs = storage.getJobs();
-    const newJobs = jobs.map((job) =>
-      job.id === id ? { ...job, [field]: value } : job
-    );
-    storage.saveJobs(newJobs);
-    return newJobs;
-  },
-
-  deleteJobs: (ids: string[]) => {
-    const jobs = storage.getJobs();
-    const newJobs = jobs.filter((job) => !ids.includes(job.id));
-    storage.saveJobs(newJobs);
-    return newJobs;
+async function fetchWithAuth(url: string, options: RequestInit = {}) {
+  const response = await fetch(url, {
+    ...options,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Network error" }));
+    throw new Error(error.message || `HTTP error ${response.status}`);
   }
+  
+  return response.json();
+}
+
+export const jobApi = {
+  getJobs: async (): Promise<JobApplication[]> => {
+    return fetchWithAuth(`${API_BASE}/jobs`);
+  },
+
+  addJob: async (job: Omit<JobApplication, "id">): Promise<JobApplication> => {
+    return fetchWithAuth(`${API_BASE}/jobs`, {
+      method: "POST",
+      body: JSON.stringify(job),
+    });
+  },
+
+  updateJob: async (id: string, updates: Partial<JobApplication>): Promise<JobApplication> => {
+    return fetchWithAuth(`${API_BASE}/jobs/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    });
+  },
+
+  deleteJobs: async (ids: string[]): Promise<{ deletedCount: number }> => {
+    return fetchWithAuth(`${API_BASE}/jobs`, {
+      method: "DELETE",
+      body: JSON.stringify({ ids }),
+    });
+  },
 };
