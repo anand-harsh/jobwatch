@@ -27,18 +27,16 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ChevronDown } from "lucide-react";
 
-const statusColors: Record<JobStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  "Applied": "secondary",
-  "Shortlisted": "default",
-  "Interview Scheduled": "default", // Blue-ish usually for primary/default
-  "Technical Interview": "default",
-  "Offer Received": "outline", // We'll style this specially later or use outline for success-like distinction if needed, or just default
-  "Rejected": "destructive",
-  "Withdrawn": "secondary",
-};
+// ... (existing imports)
+
+// ... (existing statusColors)
+
+// ... (existing getStatusStyles)
 
 // Custom styles for badges to match the "soft" aesthetic
 const getStatusStyles = (status: JobStatus) => {
@@ -54,75 +52,108 @@ const getStatusStyles = (status: JobStatus) => {
   }
 };
 
-export const columns: ColumnDef<JobApplication>[] = [
-  {
-    accessorKey: "company",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="-ml-4"
-        >
-          Company
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      )
-    },
-    cell: ({ row }) => <div className="font-semibold text-base">{row.getValue("company")}</div>,
-  },
-  {
-    accessorKey: "role",
-    header: "Role",
-    cell: ({ row }) => <div className="text-muted-foreground">{row.getValue("role")}</div>,
-  },
-  {
-    accessorKey: "category",
-    header: "Category",
-    cell: ({ row }) => (
-      <Badge variant="outline" className="font-normal text-xs uppercase tracking-wider text-muted-foreground">
-        {row.getValue("category")}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: "dateApplied",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="-ml-4"
-        >
-          Applied
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      )
-    },
-    cell: ({ row }) => <div className="text-sm">{row.getValue("dateApplied")}</div>,
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const status = row.getValue("status") as JobStatus;
-      return (
-        <Badge className={`border-0 ${getStatusStyles(status)}`}>
-          {status}
-        </Badge>
-      );
-    },
-  },
-];
-
 interface JobTableProps {
   data: JobApplication[];
+  onUpdateStatus: (id: string, newStatus: JobStatus) => void;
 }
 
-export function JobTable({ data }: JobTableProps) {
+export function JobTable({ data, onUpdateStatus }: JobTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState({});
+
+  const columns: ColumnDef<JobApplication>[] = [
+    {
+      accessorKey: "company",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="-ml-4"
+          >
+            Company
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        )
+      },
+      cell: ({ row }) => <div className="font-semibold text-base">{row.getValue("company")}</div>,
+    },
+    {
+      accessorKey: "role",
+      header: "Role",
+      cell: ({ row }) => <div className="text-muted-foreground">{row.getValue("role")}</div>,
+    },
+    {
+      accessorKey: "category",
+      header: "Category",
+      cell: ({ row }) => (
+        <Badge variant="outline" className="font-normal text-xs uppercase tracking-wider text-muted-foreground">
+          {row.getValue("category")}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: "dateApplied",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="-ml-4"
+          >
+            Applied
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        )
+      },
+      cell: ({ row }) => <div className="text-sm">{row.getValue("dateApplied")}</div>,
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const status = row.getValue("status") as JobStatus;
+        const jobId = row.original.id;
+        
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className={`h-8 px-2 lg:px-3 text-xs font-medium border-0 ring-0 hover:bg-transparent ${getStatusStyles(status)}`}
+              >
+                {status}
+                <ChevronDown className="ml-2 h-3 w-3 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[200px]">
+              {[
+                "Applied", 
+                "Shortlisted", 
+                "Interview Scheduled", 
+                "Technical Interview", 
+                "Offer Received", 
+                "Rejected", 
+                "Withdrawn"
+              ].map((s) => (
+                <DropdownMenuItem 
+                  key={s}
+                  onClick={() => onUpdateStatus(jobId, s as JobStatus)}
+                  className="cursor-pointer"
+                >
+                  <span className={`w-2 h-2 rounded-full mr-2 ${
+                    s === status ? "bg-primary" : "bg-transparent"
+                  }`} />
+                  {s}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
 
   const table = useReactTable({
     data,

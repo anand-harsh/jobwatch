@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { JobTable } from "@/components/job-table";
-import { initialJobs, JobApplication } from "@/lib/mock-data";
+import { initialJobs, JobApplication, JobStatus } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Briefcase, 
   CheckCircle2, 
@@ -15,7 +16,21 @@ import {
 } from "lucide-react";
 
 export default function Home() {
-  const [jobs] = useState<JobApplication[]>(initialJobs);
+  const [jobs, setJobs] = useState<JobApplication[]>(initialJobs);
+  const { toast } = useToast();
+
+  const handleUpdateStatus = (id: string, newStatus: JobStatus) => {
+    setJobs(prevJobs => 
+      prevJobs.map(job => 
+        job.id === id ? { ...job, status: newStatus } : job
+      )
+    );
+    
+    toast({
+      title: "Status Updated",
+      description: `Application status changed to ${newStatus}`,
+    });
+  };
 
   // Calculate stats
   const totalApplied = jobs.length;
@@ -142,7 +157,7 @@ export default function Home() {
               </div>
             </div>
             
-            <JobTable data={jobs} />
+            <JobTable data={jobs} onUpdateStatus={handleUpdateStatus} />
           </div>
 
           {/* Sidebar Section */}
