@@ -21,8 +21,9 @@ import { JobApplication, JobStatus } from "@/lib/mock-data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
-import { ArrowUpDown, Search, Filter } from "lucide-react";
+import { ArrowUpDown, Search, Filter, Plus, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -30,13 +31,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
-
-// ... (existing imports)
-
-// ... (existing statusColors)
-
-// ... (existing getStatusStyles)
 
 // Custom styles for badges to match the "soft" aesthetic
 const getStatusStyles = (status: JobStatus) => {
@@ -54,10 +48,11 @@ const getStatusStyles = (status: JobStatus) => {
 
 interface JobTableProps {
   data: JobApplication[];
-  onUpdateStatus: (id: string, newStatus: JobStatus) => void;
+  onUpdateJob: (id: string, field: keyof JobApplication, value: any) => void;
+  onAddJob: () => void;
 }
 
-export function JobTable({ data, onUpdateStatus }: JobTableProps) {
+export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState({});
@@ -77,21 +72,56 @@ export function JobTable({ data, onUpdateStatus }: JobTableProps) {
           </Button>
         )
       },
-      cell: ({ row }) => <div className="font-semibold text-base">{row.getValue("company")}</div>,
+      cell: ({ row }) => (
+        <div className="font-semibold text-base">
+          <Input 
+            value={row.getValue("company")} 
+            onChange={(e) => onUpdateJob(row.original.id, "company", e.target.value)}
+            className="h-8 border-transparent hover:border-input focus:border-input px-2 -ml-2 font-semibold bg-transparent shadow-none"
+          />
+        </div>
+      ),
     },
     {
       accessorKey: "role",
       header: "Role",
-      cell: ({ row }) => <div className="text-muted-foreground">{row.getValue("role")}</div>,
+      cell: ({ row }) => (
+        <Input 
+          value={row.getValue("role")} 
+          onChange={(e) => onUpdateJob(row.original.id, "role", e.target.value)}
+          className="h-8 border-transparent hover:border-input focus:border-input px-2 -ml-2 text-muted-foreground bg-transparent shadow-none"
+        />
+      ),
     },
     {
       accessorKey: "category",
       header: "Category",
-      cell: ({ row }) => (
-        <Badge variant="outline" className="font-normal text-xs uppercase tracking-wider text-muted-foreground">
-          {row.getValue("category")}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const category = row.getValue("category") as string;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="h-8 px-2 -ml-2 font-normal text-xs uppercase tracking-wider text-muted-foreground border border-transparent hover:border-input hover:bg-transparent"
+              >
+                {category}
+                <ChevronDown className="ml-1 h-3 w-3 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {["Big Tech", "Startup", "Mid-Tier", "Other"].map((c) => (
+                <DropdownMenuItem 
+                  key={c}
+                  onClick={() => onUpdateJob(row.original.id, "category", c)}
+                >
+                  {c}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     },
     {
       accessorKey: "dateApplied",
@@ -107,7 +137,14 @@ export function JobTable({ data, onUpdateStatus }: JobTableProps) {
           </Button>
         )
       },
-      cell: ({ row }) => <div className="text-sm">{row.getValue("dateApplied")}</div>,
+      cell: ({ row }) => (
+        <Input 
+          type="date"
+          value={row.getValue("dateApplied")} 
+          onChange={(e) => onUpdateJob(row.original.id, "dateApplied", e.target.value)}
+          className="h-8 w-[130px] border-transparent hover:border-input focus:border-input px-2 -ml-2 text-sm bg-transparent shadow-none"
+        />
+      ),
     },
     {
       accessorKey: "status",
@@ -139,7 +176,7 @@ export function JobTable({ data, onUpdateStatus }: JobTableProps) {
               ].map((s) => (
                 <DropdownMenuItem 
                   key={s}
-                  onClick={() => onUpdateStatus(jobId, s as JobStatus)}
+                  onClick={() => onUpdateJob(jobId, "status", s as JobStatus)}
                   className="cursor-pointer"
                 >
                   <span className={`w-2 h-2 rounded-full mr-2 ${
@@ -152,6 +189,18 @@ export function JobTable({ data, onUpdateStatus }: JobTableProps) {
           </DropdownMenu>
         );
       },
+    },
+    {
+      accessorKey: "notes",
+      header: "Notes",
+      cell: ({ row }) => (
+        <Input 
+          value={row.getValue("notes") || ""} 
+          placeholder="Add notes..."
+          onChange={(e) => onUpdateJob(row.original.id, "notes", e.target.value)}
+          className="h-8 border-transparent hover:border-input focus:border-input px-2 -ml-2 text-sm text-muted-foreground bg-transparent shadow-none w-full min-w-[200px]"
+        />
+      ),
     },
   ];
 
@@ -192,33 +241,36 @@ export function JobTable({ data, onUpdateStatus }: JobTableProps) {
           />
         </div>
         
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
-              <Filter className="mr-2 h-4 w-4" />
-              Filter Status
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {["Applied", "Shortlisted", "Interview Scheduled", "Offer Received", "Rejected"].map((status) => (
-              <DropdownMenuCheckboxItem
-                key={status}
-                checked={(table.getColumn("status")?.getFilterValue() as string[])?.includes(status)}
-                onCheckedChange={(checked) => {
-                   // Simple filter implementation for demo
-                   // In a real app we'd likely use a faceted filter component
-                   const current = (table.getColumn("status")?.getFilterValue() as string[]) || [];
-                   // This is a simplified placeholder for proper array filtering
-                   // For now, let's just clear if unchecked or set if checked to show intent
-                   if (checked) table.getColumn("status")?.setFilterValue(status);
-                   else table.getColumn("status")?.setFilterValue(undefined);
-                }}
-              >
-                {status}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2">
+          <Button onClick={onAddJob} className="bg-primary text-primary-foreground hover:bg-primary/90">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Application
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="ml-auto">
+                <Filter className="mr-2 h-4 w-4" />
+                Filter Status
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {["Applied", "Shortlisted", "Interview Scheduled", "Offer Received", "Rejected"].map((status) => (
+                <DropdownMenuCheckboxItem
+                  key={status}
+                  checked={(table.getColumn("status")?.getFilterValue() as string[])?.includes(status)}
+                  onCheckedChange={(checked) => {
+                     const current = (table.getColumn("status")?.getFilterValue() as string[]) || [];
+                     if (checked) table.getColumn("status")?.setFilterValue(status);
+                     else table.getColumn("status")?.setFilterValue(undefined);
+                  }}
+                >
+                  {status}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <div className="rounded-xl border bg-white dark:bg-slate-950 shadow-sm overflow-hidden">

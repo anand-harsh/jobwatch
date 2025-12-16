@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { JobTable } from "@/components/job-table";
-import { initialJobs, JobApplication, JobStatus } from "@/lib/mock-data";
+import { initialJobs, JobApplication } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 import { 
   Briefcase, 
   CheckCircle2, 
@@ -19,16 +20,38 @@ export default function Home() {
   const [jobs, setJobs] = useState<JobApplication[]>(initialJobs);
   const { toast } = useToast();
 
-  const handleUpdateStatus = (id: string, newStatus: JobStatus) => {
+  const handleUpdateJob = (id: string, field: keyof JobApplication, value: any) => {
     setJobs(prevJobs => 
       prevJobs.map(job => 
-        job.id === id ? { ...job, status: newStatus } : job
+        job.id === id ? { ...job, [field]: value } : job
       )
     );
     
+    // Optional: Toast for major status changes only, or debounced save indicator
+    if (field === 'status') {
+      toast({
+        title: "Status Updated",
+        description: `Application status changed to ${value}`,
+      });
+    }
+  };
+
+  const handleAddJob = () => {
+    const newJob: JobApplication = {
+      id: `job-new-${Date.now()}`,
+      company: "New Company",
+      role: "Software Engineer",
+      dateApplied: format(new Date(), "yyyy-MM-dd"),
+      status: "Applied",
+      notes: "",
+      category: "Startup"
+    };
+
+    setJobs(prev => [newJob, ...prev]);
+    
     toast({
-      title: "Status Updated",
-      description: `Application status changed to ${newStatus}`,
+      title: "Application Added",
+      description: "New job application added to the top of the list.",
     });
   };
 
@@ -157,7 +180,7 @@ export default function Home() {
               </div>
             </div>
             
-            <JobTable data={jobs} onUpdateStatus={handleUpdateStatus} />
+            <JobTable data={jobs} onUpdateJob={handleUpdateJob} onAddJob={handleAddJob} />
           </div>
 
           {/* Sidebar Section */}
