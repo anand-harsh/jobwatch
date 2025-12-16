@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { JobTable } from "@/components/job-table";
-import { initialJobs, JobApplication } from "@/lib/mock-data";
+import { JobApplication } from "@/lib/mock-data";
+import { storage } from "@/lib/storage";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { 
@@ -13,21 +16,25 @@ import {
   TrendingUp, 
   Calendar,
   Building2,
-  PieChart
+  PieChart,
+  LogOut
 } from "lucide-react";
 
 export default function Home() {
-  const [jobs, setJobs] = useState<JobApplication[]>(initialJobs);
+  const [jobs, setJobs] = useState<JobApplication[]>([]);
   const { toast } = useToast();
+  const { user, logout } = useAuth();
+
+  useEffect(() => {
+    // Load data from storage on mount
+    setJobs(storage.getJobs());
+  }, []);
 
   const handleUpdateJob = (id: string, field: keyof JobApplication, value: any) => {
-    setJobs(prevJobs => 
-      prevJobs.map(job => 
-        job.id === id ? { ...job, [field]: value } : job
-      )
-    );
+    const updatedJobs = storage.updateJob(id, field, value);
+    setJobs(updatedJobs);
     
-    // Optional: Toast for major status changes only, or debounced save indicator
+    // Only toast on status changes for less noise
     if (field === 'status') {
       toast({
         title: "Status Updated",
@@ -47,7 +54,8 @@ export default function Home() {
       category: "Startup"
     };
 
-    setJobs(prev => [newJob, ...prev]);
+    const updatedJobs = storage.addJob(newJob);
+    setJobs(updatedJobs);
     
     toast({
       title: "Application Added",
@@ -63,7 +71,7 @@ export default function Home() {
   const offers = jobs.filter(j => j.status === "Offer Received").length;
   const rejected = jobs.filter(j => j.status === "Rejected").length;
   
-  // Recent activity (simulated by taking first 3 jobs as they are "newest" in our mock)
+  // Recent activity
   const recentActivity = jobs.slice(0, 4);
 
   return (
@@ -79,12 +87,15 @@ export default function Home() {
         <nav className="ml-auto flex items-center gap-6 text-sm font-medium">
           <a href="#" className="text-foreground transition-colors hover:text-primary">Dashboard</a>
           <a href="#" className="text-muted-foreground transition-colors hover:text-primary">Applications</a>
-          <a href="#" className="text-muted-foreground transition-colors hover:text-primary">Companies</a>
-          <a href="#" className="text-muted-foreground transition-colors hover:text-primary">Calendar</a>
+          <div className="flex items-center gap-4 border-l pl-6 ml-2">
+             <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+               {user}
+             </span>
+             <Button variant="ghost" size="sm" onClick={logout} className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive">
+               <LogOut className="h-4 w-4" />
+             </Button>
+          </div>
         </nav>
-        <div className="ml-4 h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-800 border overflow-hidden">
-          <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
-        </div>
       </header>
 
       <main className="p-6 lg:p-10 max-w-7xl mx-auto space-y-8">
@@ -93,7 +104,7 @@ export default function Home() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-heading font-bold text-slate-900 dark:text-slate-50">
-              Welcome back, Alex!
+              Welcome back, {user}!
             </h1>
             <p className="text-slate-500 dark:text-slate-400 mt-1">
               Here's what's happening with your job search today.

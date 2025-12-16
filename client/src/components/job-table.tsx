@@ -21,7 +21,6 @@ import { JobApplication, JobStatus } from "@/lib/mock-data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
 import { ArrowUpDown, Search, Filter, Plus, ChevronDown } from "lucide-react";
 import {
@@ -31,8 +30,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { EditableCell } from "./editable-cell";
 
-// Custom styles for badges to match the "soft" aesthetic
+// Custom styles for badges
 const getStatusStyles = (status: JobStatus) => {
   switch (status) {
     case "Applied": return "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300";
@@ -56,6 +63,7 @@ export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState({});
+  const [pageSize, setPageSize] = useState(10);
 
   const columns: ColumnDef<JobApplication>[] = [
     {
@@ -73,23 +81,21 @@ export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
         )
       },
       cell: ({ row }) => (
-        <div className="font-semibold text-base">
-          <Input 
-            value={row.getValue("company")} 
-            onChange={(e) => onUpdateJob(row.original.id, "company", e.target.value)}
-            className="h-8 border-transparent hover:border-input focus:border-input px-2 -ml-2 font-semibold bg-transparent shadow-none"
-          />
-        </div>
+        <EditableCell
+          value={row.getValue("company")}
+          onUpdate={(val) => onUpdateJob(row.original.id, "company", val)}
+          className="font-semibold text-base"
+        />
       ),
     },
     {
       accessorKey: "role",
       header: "Role",
       cell: ({ row }) => (
-        <Input 
-          value={row.getValue("role")} 
-          onChange={(e) => onUpdateJob(row.original.id, "role", e.target.value)}
-          className="h-8 border-transparent hover:border-input focus:border-input px-2 -ml-2 text-muted-foreground bg-transparent shadow-none"
+        <EditableCell
+          value={row.getValue("role")}
+          onUpdate={(val) => onUpdateJob(row.original.id, "role", val)}
+          className="text-muted-foreground"
         />
       ),
     },
@@ -138,11 +144,11 @@ export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
         )
       },
       cell: ({ row }) => (
-        <Input 
+        <EditableCell
           type="date"
-          value={row.getValue("dateApplied")} 
-          onChange={(e) => onUpdateJob(row.original.id, "dateApplied", e.target.value)}
-          className="h-8 w-[130px] border-transparent hover:border-input focus:border-input px-2 -ml-2 text-sm bg-transparent shadow-none"
+          value={row.getValue("dateApplied")}
+          onUpdate={(val) => onUpdateJob(row.original.id, "dateApplied", val)}
+          className="text-sm w-[130px]"
         />
       ),
     },
@@ -194,11 +200,12 @@ export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
       accessorKey: "notes",
       header: "Notes",
       cell: ({ row }) => (
-        <Input 
-          value={row.getValue("notes") || ""} 
+        <EditableCell
+          type="textarea"
+          value={row.getValue("notes")}
+          onUpdate={(val) => onUpdateJob(row.original.id, "notes", val)}
           placeholder="Add notes..."
-          onChange={(e) => onUpdateJob(row.original.id, "notes", e.target.value)}
-          className="h-8 border-transparent hover:border-input focus:border-input px-2 -ml-2 text-sm text-muted-foreground bg-transparent shadow-none w-full min-w-[200px]"
+          className="text-sm text-muted-foreground w-full min-w-[200px]"
         />
       ),
     },
@@ -218,6 +225,10 @@ export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
       sorting,
       columnFilters,
       rowSelection,
+      pagination: {
+        pageIndex: 0,
+        pageSize: pageSize === -1 ? data.length : pageSize,
+      }
     },
     initialState: {
       pagination: {
@@ -225,6 +236,13 @@ export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
       }
     }
   });
+
+  // Handle "All" pagination
+  const handlePageSizeChange = (val: string) => {
+    const size = parseInt(val);
+    setPageSize(size);
+    table.setPageSize(size === -1 ? data.length : size);
+  };
 
   return (
     <div className="space-y-4">
@@ -260,7 +278,6 @@ export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
                   key={status}
                   checked={(table.getColumn("status")?.getFilterValue() as string[])?.includes(status)}
                   onCheckedChange={(checked) => {
-                     const current = (table.getColumn("status")?.getFilterValue() as string[]) || [];
                      if (checked) table.getColumn("status")?.setFilterValue(status);
                      else table.getColumn("status")?.setFilterValue(undefined);
                   }}
@@ -299,7 +316,7 @@ export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors cursor-pointer"
+                  className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="py-3">
@@ -319,23 +336,49 @@ export function JobTable({ data, onUpdateJob, onAddJob }: JobTableProps) {
         </Table>
       </div>
 
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-        >
-          Next
-        </Button>
+      <div className="flex items-center justify-between py-4">
+        <div className="flex items-center space-x-2">
+          <p className="text-sm text-muted-foreground">Rows per page</p>
+          <Select 
+            value={pageSize.toString()} 
+            onValueChange={handlePageSizeChange}
+          >
+            <SelectTrigger className="h-8 w-[70px]">
+              <SelectValue placeholder={pageSize} />
+            </SelectTrigger>
+            <SelectContent side="top">
+              {[10, 20, 30, 40, 50].map((pageSize) => (
+                <SelectItem key={pageSize} value={`${pageSize}`}>
+                  {pageSize}
+                </SelectItem>
+              ))}
+              <SelectItem value="-1">All</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <div className="text-sm text-muted-foreground mr-4">
+            Page {table.getState().pagination.pageIndex + 1} of{" "}
+            {table.getPageCount()}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   );
