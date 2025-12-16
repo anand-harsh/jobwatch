@@ -1,15 +1,21 @@
 {
-    "version":2,
-    "builds":[
-        {
-            "src":"server.js",
-            "use":"@vercel/node"
-        }
-    ],
-    "routes":[
-        {
-            "src":"/(.*)",
-            "dest":"server.js"
-        }
-    ]
+  "version": 2,
+  "buildCommand": "npx vite build",
+  "outputDirectory": "dist/public",
+  "framework": "vite",
+  "functions": {
+    "api/index.ts": {
+      "runtime": "@vercel/node@3"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }

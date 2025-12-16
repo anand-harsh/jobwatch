@@ -81,3 +81,20 @@ shared/           # Shared types/schemas
 - `@replit/vite-plugin-runtime-error-modal`: Development error overlay
 - `@replit/vite-plugin-cartographer`: Development mapping
 - `@replit/vite-plugin-dev-banner`: Development banner
+
+## Deployment
+
+### Vercel Deployment
+The project is configured for Vercel deployment:
+- **API**: Express routes run as serverless functions via `api/index.ts`
+- **Frontend**: Vite builds static assets to `dist/public/`
+- **Configuration**: See `vercel.json` for routing and build settings
+
+#### Required Vercel Environment Variables
+- `DATABASE_URL`: PostgreSQL connection string
+- `SESSION_SECRET`: Secret key for session encryption
+
+#### Deployment Steps
+1. Connect your GitHub repository to Vercel
+2. Add environment variables in Vercel project settings
+3. Deploy - Vercel will auto-detect the Vite framework
