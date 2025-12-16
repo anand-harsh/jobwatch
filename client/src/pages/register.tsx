@@ -7,28 +7,44 @@ import { Label } from "@/components/ui/label";
 import { Briefcase, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 
-export default function Login() {
+export default function Register() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login } = useAuth();
+  const { register } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     if (!username.trim() || !password.trim()) {
-      setError("Please enter both username and password");
+      setError("Please fill in all fields");
+      return;
+    }
+
+    if (username.length < 3) {
+      setError("Username must be at least 3 characters");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
       return;
     }
 
     setIsSubmitting(true);
-    const result = await login(username, password);
+    const result = await register(username, password);
     setIsSubmitting(false);
 
     if (!result.success) {
-      setError(result.error || "Login failed");
+      setError(result.error || "Registration failed");
     }
   };
 
@@ -39,9 +55,9 @@ export default function Login() {
           <div className="mx-auto bg-primary text-primary-foreground p-3 rounded-xl w-fit mb-2">
             <Briefcase className="h-8 w-8" />
           </div>
-          <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
+          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
           <CardDescription>
-            Sign in to access your Job Tracker
+            Register to start tracking your job applications
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -55,7 +71,7 @@ export default function Login() {
               <Label htmlFor="username">Username</Label>
               <Input
                 id="username"
-                placeholder="Enter your username"
+                placeholder="Choose a username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="h-11"
@@ -67,9 +83,21 @@ export default function Login() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder="Choose a password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="h-11"
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="Confirm your password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 className="h-11"
                 disabled={isSubmitting}
               />
@@ -78,18 +106,18 @@ export default function Login() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing In...
+                  Creating Account...
                 </>
               ) : (
-                "Sign In"
+                "Create Account"
               )}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm text-muted-foreground">
             <p>
-              Don't have an account?{" "}
-              <Link href="/register" className="text-primary hover:underline font-medium">
-                Register
+              Already have an account?{" "}
+              <Link href="/login" className="text-primary hover:underline font-medium">
+                Sign In
               </Link>
             </p>
           </div>
