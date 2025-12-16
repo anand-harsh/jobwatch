@@ -1,12 +1,9 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { type Server } from "http";
 import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
-import pg from "pg";
+import MongoStore from "connect-mongo";
 import { storage } from "./storage";
 import { z } from "zod";
-
-const PgSession = connectPgSimple(session);
 
 declare module "express-session" {
   interface SessionData {
@@ -36,9 +33,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  const DATABASE_URL = process.env.DATABASE_URL;
-  if (!DATABASE_URL) {
-    throw new Error("DATABASE_URL environment variable is not set");
+  const MONGODB_URI = process.env.MONGODB_URI;
+  if (!MONGODB_URI) {
+    throw new Error("MONGODB_URI environment variable is not set");
   }
 
   const SESSION_SECRET = process.env.SESSION_SECRET;
@@ -46,19 +43,14 @@ export async function registerRoutes(
     throw new Error("SESSION_SECRET environment variable is not set");
   }
 
-  const pgPool = new pg.Pool({
-    connectionString: DATABASE_URL,
-  });
-
   app.use(
     session({
       secret: SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
-      store: new PgSession({
-        pool: pgPool,
-        tableName: "session",
-        createTableIfMissing: true,
+      store: MongoStore.create({
+        mongoUrl: MONGODB_URI,
+        collectionName: "sessions",
       }),
       cookie: {
         secure: process.env.NODE_ENV === "production",

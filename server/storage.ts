@@ -1,9 +1,12 @@
-import { db } from "./db";
-import { users, type User } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { User, type IUser } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
-export interface UserWithMethods extends User {
+export interface UserWithMethods {
+  id: string;
+  username: string;
+  password: string;
+  createdAt: Date;
+  updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -13,10 +16,14 @@ export interface IStorage {
   createUser(username: string, password: string): Promise<UserWithMethods>;
 }
 
-export class PostgresStorage implements IStorage {
-  private addMethods(user: User): UserWithMethods {
+export class MongoStorage implements IStorage {
+  private addMethods(user: IUser): UserWithMethods {
     return {
-      ...user,
+      id: user._id.toString(),
+      username: user.username,
+      password: user.password,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
       comparePassword: async (candidatePassword: string) => {
         return bcrypt.compare(candidatePassword, user.password);
       },
@@ -24,29 +31,26 @@ export class PostgresStorage implements IStorage {
   }
 
   async getUser(id: string): Promise<UserWithMethods | null> {
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    return result.length > 0 ? this.addMethods(result[0]) : null;
+    const user = await User.findById(id);
+    return user ? this.addMethods(user) : null;
   }
 
   async getUserByUsername(username: string): Promise<UserWithMethods | null> {
-    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
-    return result.length > 0 ? this.addMethods(result[0]) : null;
+    const user = await User.findOne({ username });
+    return user ? this.addMethods(user) : null;
   }
 
   async createUser(username: string, password: string): Promise<UserWithMethods> {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const result = await db
-      .insert(users)
-      .values({
-        username,
-        password: hashedPassword,
-      })
-      .returning();
+    const user = await User.create({
+      username,
+      password: hashedPassword,
+    });
 
-    return this.addMethods(result[0]);
+    return this.addMethods(user);
   }
 }
 
-export const storage = new PostgresStorage();
+export const storage = new MongoStorage();

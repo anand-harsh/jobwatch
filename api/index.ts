@@ -1,27 +1,21 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
-import pg from "pg";
+import MongoStore from "connect-mongo";
+import mongoose from "mongoose";
 import { z } from "zod";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { pgTable, text, varchar, timestamp } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs";
 
-const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
-});
+const userSchema = new mongoose.Schema(
+  {
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+  },
+  { timestamps: true }
+);
 
-type User = typeof users.$inferSelect;
-
-const PgSession = connectPgSimple(session);
+const User = mongoose.models.User || mongoose.model("User", userSchema);
 
 declare module "express-session" {
   interface SessionData {
@@ -35,9 +29,9 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  throw new Error("MONGODB_URI environment variable is not set");
 }
 
 const SESSION_SECRET = process.env.SESSION_SECRET;
@@ -45,25 +39,22 @@ if (!SESSION_SECRET) {
   throw new Error("SESSION_SECRET environment variable is not set");
 }
 
-const pool = new pg.Pool({
-  connectionString: DATABASE_URL,
-});
+let isConnected = false;
 
-const db = drizzle(pool);
-
-const pgPool = new pg.Pool({
-  connectionString: DATABASE_URL,
-});
+async function connectDB() {
+  if (isConnected) return;
+  await mongoose.connect(MONGODB_URI!);
+  isConnected = true;
+}
 
 app.use(
   session({
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: new PgSession({
-      pool: pgPool,
-      tableName: "session",
-      createTableIfMissing: true,
+    store: MongoStore.create({
+      mongoUrl: MONGODB_URI,
+      collectionName: "sessions",
     }),
     cookie: {
       secure: process.env.NODE_ENV === "production",
@@ -74,13 +65,18 @@ app.use(
   })
 );
 
-interface UserWithMethods extends User {
+interface UserWithMethods {
+  id: string;
+  username: string;
+  password: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
-function addMethods(user: User): UserWithMethods {
+function addMethods(user: any): UserWithMethods {
   return {
-    ...user,
+    id: user._id.toString(),
+    username: user.username,
+    password: user.password,
     comparePassword: async (candidatePassword: string) => {
       return bcrypt.compare(candidatePassword, user.password);
     },
@@ -88,23 +84,22 @@ function addMethods(user: User): UserWithMethods {
 }
 
 async function getUserByUsername(username: string): Promise<UserWithMethods | null> {
-  const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
-  return result.length > 0 ? addMethods(result[0]) : null;
+  await connectDB();
+  const user = await User.findOne({ username });
+  return user ? addMethods(user) : null;
 }
 
 async function createUser(username: string, password: string): Promise<UserWithMethods> {
+  await connectDB();
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
 
-  const result = await db
-    .insert(users)
-    .values({
-      username,
-      password: hashedPassword,
-    })
-    .returning();
+  const user = await User.create({
+    username,
+    password: hashedPassword,
+  });
 
-  return addMethods(result[0]);
+  return addMethods(user);
 }
 
 const registerSchema = z.object({
