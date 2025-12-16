@@ -1,0 +1,67 @@
+import openpyxl
+from openpyxl.worksheet.datavalidation import DataValidation
+from datetime import datetime
+
+# List of companies from your job application targets (compiled from previous lists)
+companies = [
+    # Big Tech/Service Companies
+    "TCS", "Infosys", "Wipro", "Cognizant", "Accenture", "HCLTech", "Tech Mahindra", 
+    "Capgemini", "IBM", "Deloitte", "Amazon", "Microsoft", "Google", "Meta", "Adobe", 
+    "Oracle", "Flipkart", "Walmart Labs", "Cisco", "Intel",
+    
+    # Startups
+    "Jar", "Zepto", "Blinkit (Grofers)", "PhysicsWallah", "Unacademy", "Urban Company", 
+    "PolicyBazaar", "Innoviti Solutions", "Rupeek", "Cuemath", "Fashinza", "Loop Health", 
+    "Byju's", "Perfios", "Livspace", "INCREFF", "BlueStone.com", "Pristyn Care", 
+    "Rentomojo", "MyGlamm", "Scripbox", "Lokal", "CoinSwitch", "DrinkPrime", 
+    "ClearFeed", "RIM Labs", "Crafter Inc", "Liberin Technologies", "10x", 
+    "Sadhana IT Solutions", "Futops Technologies", "Notetech Software", 
+    "Propel Technology Group", "Mindtickle", "Agoda", "KiE Square Analytics", 
+    "Vit", "ShortLoop", "Aikenist", "Fluxon",
+    
+    # Mid-Tier Product-Based Companies
+    "Paytm", "Swiggy", "Zoho", "Freshworks", "Razorpay", "PhonePe", "CRED", 
+    "Meesho", "InMobi", "Dream11", "Ather Energy", "Zerodha", "Pine Labs", 
+    "NoBroker", "Nykaa", "Groww", "Udaan", "MakeMyTrip", "Ola Electric", 
+    "Postman", "PostiPay", "Chargebee", "CleverTap", "MoEngage"
+]
+
+# Status options for dropdown
+status_options = "Applied,Shortlisted,Interview Scheduled,Technical Interview,Offer Received,Rejected,Withdrawn"
+
+# Create workbook
+wb = openpyxl.Workbook()
+ws = wb.active
+ws.title = "Job Tracker"
+
+# Headers
+headers = ["Company", "Role", "Date Applied", "Status", "Notes"]
+ws.append(headers)
+
+# Pre-fill companies
+for i, company in enumerate(companies, start=2):
+    ws[f"A{i}"] = company
+    ws[f"B{i}"] = "SDE/SWE/Backend"  # Default role
+    ws[f"C{i}"] = datetime.now().strftime("%Y-%m-%d")  # Today's date as placeholder
+
+# Create data validation for Status column (E)
+dv = DataValidation(type="list", formula1=f'"{status_options}"', allow_blank=True)
+dv.add("E2:E1000")  # Apply to first 1000 rows (adjust as needed)
+ws.add_data_validation(dv)
+
+# Auto-adjust column widths
+for column in ws.columns:
+    max_length = 0
+    column_letter = column[0].column_letter
+    for cell in column:
+        try:
+            if len(str(cell.value)) > max_length:
+                max_length = len(str(cell.value))
+        except:
+            pass
+    adjusted_width = min(max_length + 2, 50)
+    ws.column_dimensions[column_letter].width = adjusted_width
+
+# Save the file
+wb.save("job_tracker.xlsx")
+print("Excel file 'job_tracker.xlsx' created successfully! Open it in Excel/LibreOffice to start tracking your applications.")
