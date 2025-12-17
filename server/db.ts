@@ -1,20 +1,25 @@
-import { drizzle } from "drizzle-orm/neon-serverless";
-import { Pool, neonConfig } from "@neondatabase/serverless";
-import ws from "ws";
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
+// Use SUPABASE_DATABASE_URL if available, otherwise fall back to DATABASE_URL
+const connectionString = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error("SUPABASE_DATABASE_URL or DATABASE_URL environment variable is not set");
 }
 
-neonConfig.webSocketConstructor = ws;
+const pool = new pg.Pool({ 
+  connectionString,
+  ssl: { rejectUnauthorized: false }
+});
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool);
 
 export async function connectDB() {
   try {
     const client = await pool.connect();
-    console.log("Connected to PostgreSQL");
+    const dbType = process.env.SUPABASE_DATABASE_URL ? "Supabase" : "Replit";
+    console.log(`Connected to PostgreSQL (${dbType})`);
     client.release();
   } catch (error) {
     console.error("PostgreSQL connection error:", error);

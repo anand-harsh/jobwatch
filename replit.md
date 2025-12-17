@@ -73,12 +73,76 @@ shared/           # Shared types/schemas
 ## External Dependencies
 
 ### Database
-- **PostgreSQL**: Replit built-in PostgreSQL database (Neon-backed)
-- **Connection**: Configured via `DATABASE_URL` environment variable (automatically set by Replit)
+- **PostgreSQL**: Supabase PostgreSQL database
+- **Connection**: Configured via `DATABASE_URL` environment variable
 
 ### Environment Variables Required
-- `DATABASE_URL`: PostgreSQL connection string (automatically provided by Replit)
+- `SUPABASE_DATABASE_URL`: Supabase PostgreSQL connection string (get from Supabase Dashboard > Settings > Database > Connection string > URI)
 - `SESSION_SECRET`: Secret key for session encryption (optional, defaults to dev secret)
+
+Note: If `SUPABASE_DATABASE_URL` is not set, the app falls back to Replit's built-in `DATABASE_URL`.
+
+### Supabase Setup Instructions
+
+1. **Create a Supabase Project**:
+   - Go to https://supabase.com and sign in
+   - Click "New Project" and fill in the details
+   - Wait for the project to be provisioned
+
+2. **Get your Database URL**:
+   - Go to your project dashboard
+   - Navigate to **Settings** > **Database**
+   - Scroll to **Connection string** section
+   - Select **URI** tab
+   - Copy the connection string (it looks like: `postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres`)
+
+3. **Add SUPABASE_DATABASE_URL to Replit**:
+   - In Replit, go to the "Secrets" tab (lock icon)
+   - Add a new secret with key `SUPABASE_DATABASE_URL` and paste your Supabase connection string
+
+4. **Run the SQL queries in Supabase**:
+   - Go to your Supabase project dashboard
+   - Navigate to **SQL Editor**
+   - Run the queries provided below to create the required tables
+
+### SQL Queries for Supabase
+
+Run these queries in the Supabase SQL Editor to set up your database:
+
+```sql
+-- Create users table
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(255) NOT NULL UNIQUE,
+  password VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
+-- Create job_applications table
+CREATE TABLE IF NOT EXISTS job_applications (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  company VARCHAR(255) NOT NULL,
+  role VARCHAR(255) NOT NULL,
+  date_applied VARCHAR(255) NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'Applied',
+  notes TEXT NOT NULL DEFAULT '',
+  category VARCHAR(50) NOT NULL DEFAULT 'Other',
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
+-- Create session table for connect-pg-simple
+CREATE TABLE IF NOT EXISTS "session" (
+  "sid" VARCHAR NOT NULL COLLATE "default",
+  "sess" JSON NOT NULL,
+  "expire" TIMESTAMP(6) NOT NULL,
+  PRIMARY KEY ("sid")
+);
+
+CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+```
 
 ### Key NPM Packages
 - **UI**: @radix-ui/* primitives, @tanstack/react-table, lucide-react icons
