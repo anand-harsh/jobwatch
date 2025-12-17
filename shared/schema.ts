@@ -1,24 +1,17 @@
-import mongoose, { Schema, Document, Types } from "mongoose";
+import { pgTable, serial, varchar, text, timestamp } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
-// User Schema
-export interface IUser extends Document {
-  _id: Types.ObjectId;
-  username: string;
-  password: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// User Table
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: varchar("username", { length: 255 }).notNull().unique(),
+  password: varchar("password", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
-const userSchema = new Schema<IUser>(
-  {
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-  },
-  { timestamps: true }
-);
-
-export const User = mongoose.models.User || mongoose.model<IUser>("User", userSchema);
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
 
 export const insertUserSchema = z.object({
   username: z.string().min(3).max(30),
@@ -27,7 +20,7 @@ export const insertUserSchema = z.object({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
-// Job Application Schema
+// Job Application Table
 export type JobStatus = 
   | "Applied" 
   | "Shortlisted" 
@@ -39,41 +32,21 @@ export type JobStatus =
 
 export type JobCategory = "Big Tech" | "Startup" | "Mid-Tier" | "Other";
 
-export interface IJobApplication extends Document {
-  _id: Types.ObjectId;
-  userId: Types.ObjectId;
-  company: string;
-  role: string;
-  dateApplied: string;
-  status: JobStatus;
-  notes: string;
-  category: JobCategory;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export const jobApplications = pgTable("job_applications", {
+  id: serial("id").primaryKey(),
+  userId: serial("user_id").notNull().references(() => users.id),
+  company: varchar("company", { length: 255 }).notNull(),
+  role: varchar("role", { length: 255 }).notNull(),
+  dateApplied: varchar("date_applied", { length: 255 }).notNull(),
+  status: varchar("status", { length: 50 }).notNull().default("Applied"),
+  notes: text("notes").default("").notNull(),
+  category: varchar("category", { length: 50 }).notNull().default("Other"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
-const jobApplicationSchema = new Schema<IJobApplication>(
-  {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    company: { type: String, required: true },
-    role: { type: String, required: true },
-    dateApplied: { type: String, required: true },
-    status: { 
-      type: String, 
-      enum: ["Applied", "Shortlisted", "Interview Scheduled", "Technical Interview", "Offer Received", "Rejected", "Withdrawn"],
-      default: "Applied"
-    },
-    notes: { type: String, default: "" },
-    category: { 
-      type: String, 
-      enum: ["Big Tech", "Startup", "Mid-Tier", "Other"],
-      default: "Other"
-    },
-  },
-  { timestamps: true }
-);
-
-export const JobApplication = mongoose.models.JobApplication || mongoose.model<IJobApplication>("JobApplication", jobApplicationSchema);
+export type JobApplication = typeof jobApplications.$inferSelect;
+export type NewJobApplication = typeof jobApplications.$inferInsert;
 
 export const insertJobSchema = z.object({
   company: z.string().min(1),
