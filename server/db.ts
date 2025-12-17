@@ -2,10 +2,21 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 
 // Use SUPABASE_DATABASE_URL if available, otherwise fall back to DATABASE_URL
-const connectionString = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
+const supabaseUrl = process.env.SUPABASE_DATABASE_URL;
+const replitUrl = process.env.DATABASE_URL;
 
-if (!connectionString) {
-  throw new Error("SUPABASE_DATABASE_URL or DATABASE_URL environment variable is not set");
+// Determine which connection string to use
+let connectionString: string;
+let dbSource: string;
+
+if (supabaseUrl) {
+  connectionString = supabaseUrl;
+  dbSource = "Supabase";
+} else if (replitUrl) {
+  connectionString = replitUrl;
+  dbSource = "Replit";
+} else {
+  throw new Error("No database URL configured. Set SUPABASE_DATABASE_URL or DATABASE_URL.");
 }
 
 const pool = new pg.Pool({ 
@@ -18,11 +29,18 @@ export const db = drizzle(pool);
 export async function connectDB() {
   try {
     const client = await pool.connect();
-    const dbType = process.env.SUPABASE_DATABASE_URL ? "Supabase" : "Replit";
-    console.log(`Connected to PostgreSQL (${dbType})`);
+    console.log(`Connected to PostgreSQL (${dbSource})`);
     client.release();
-  } catch (error) {
-    console.error("PostgreSQL connection error:", error);
+  } catch (error: any) {
+    if (error.code === 'ENOTFOUND') {
+      console.error(`Database connection failed: Cannot resolve hostname.`);
+      console.error(`Please verify your ${dbSource === 'Supabase' ? 'SUPABASE_DATABASE_URL' : 'DATABASE_URL'} is correct.`);
+      if (dbSource === 'Supabase') {
+        console.error(`Tip: Check Supabase Dashboard > Settings > Database > Connection string`);
+      }
+    } else {
+      console.error("PostgreSQL connection error:", error);
+    }
     process.exit(1);
   }
 }
