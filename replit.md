@@ -6,6 +6,15 @@ Job Tracker Pro is a full-stack web application for tracking job applications, i
 
 Each user has their own private data - job applications are associated with individual user accounts for complete data isolation.
 
+## Recent Changes
+
+### December 2024 - MongoDB to PostgreSQL Migration
+- Migrated from MongoDB to Replit's built-in PostgreSQL database
+- Replaced Mongoose with Drizzle ORM for better type safety
+- Updated session storage from connect-mongo to connect-pg-simple
+- Schema migrations now use `npm run db:push` via Drizzle Kit
+- Improved integration with Replit's database features (rollback support, easier management)
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -25,19 +34,19 @@ Preferred communication style: Simple, everyday language.
 - **Runtime**: Node.js with Express
 - **Language**: TypeScript with tsx for development execution
 - **API Pattern**: RESTful JSON APIs under `/api` prefix
-- **Session Management**: express-session with MongoDB store (connect-mongo)
+- **Session Management**: express-session with PostgreSQL store (connect-pg-simple)
 
 ### Authentication
 - **Strategy**: Session-based authentication with cookies
 - **Password Hashing**: bcryptjs
-- **Session Storage**: MongoDB via connect-mongo
+- **Session Storage**: PostgreSQL via connect-pg-simple
 - **Protected Routes**: Custom `requireAuth` middleware checks `req.session.userId`
 
 ### Data Storage
-- **Primary Database**: MongoDB (MongoDB Atlas or self-hosted)
-- **ODM**: Mongoose for schema definitions and queries
-- **Schema Definition**: Mongoose models in `shared/schema.ts`
-- **Connection**: Uses `MONGODB_URI` environment variable
+- **Primary Database**: PostgreSQL (Replit built-in database)
+- **ORM**: Drizzle ORM for schema definitions and queries
+- **Schema Definition**: Drizzle schema tables in `shared/schema.ts`
+- **Connection**: Uses `DATABASE_URL` environment variable
 - **Data Isolation**: Each user's job applications are stored with their userId reference
 
 ### Build Configuration
@@ -55,25 +64,25 @@ client/           # React frontend
     hooks/        # Custom React hooks
 server/           # Express backend
   routes.ts       # API route definitions (auth + jobs CRUD)
-  storage.ts      # Data access layer with MongoStorage implementation
-  db.ts           # MongoDB connection setup
+  storage.ts      # Data access layer with PostgresStorage implementation
+  db.ts           # PostgreSQL connection setup
 shared/           # Shared types/schemas
-  schema.ts       # Mongoose model definitions (User, JobApplication)
+  schema.ts       # Drizzle schema definitions (users, jobApplications)
 ```
 
 ## External Dependencies
 
 ### Database
-- **MongoDB**: MongoDB Atlas cloud database or self-hosted MongoDB
-- **Connection**: Configured via `MONGODB_URI` environment variable
+- **PostgreSQL**: Replit built-in PostgreSQL database (Neon-backed)
+- **Connection**: Configured via `DATABASE_URL` environment variable (automatically set by Replit)
 
 ### Environment Variables Required
-- `MONGODB_URI`: MongoDB connection string (e.g., mongodb+srv://user:pass@cluster.mongodb.net/dbname)
+- `DATABASE_URL`: PostgreSQL connection string (automatically provided by Replit)
 - `SESSION_SECRET`: Secret key for session encryption (optional, defaults to dev secret)
 
 ### Key NPM Packages
 - **UI**: @radix-ui/* primitives, @tanstack/react-table, lucide-react icons
-- **Backend**: express, express-session, connect-mongo, mongoose, bcryptjs
+- **Backend**: express, express-session, connect-pg-simple, drizzle-orm, @neondatabase/serverless, bcryptjs
 - **Validation**: zod for request validation
 - **Date Handling**: date-fns
 
@@ -101,6 +110,7 @@ shared/           # Shared types/schemas
 
 ### Replit Deployment
 The project runs natively on Replit:
-- **Database**: Connect to MongoDB Atlas or external MongoDB
-- **Environment**: Set MONGODB_URI in Replit Secrets
+- **Database**: Uses Replit's built-in PostgreSQL database (automatically configured)
+- **Environment**: DATABASE_URL is automatically provided by Replit
 - **Publishing**: Use the Replit publish feature to deploy your application
+- **Database Migrations**: Run `npm run db:push` to sync schema changes
