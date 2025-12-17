@@ -1,32 +1,23 @@
-import mongoose from "mongoose";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import ws from "ws";
 
-if (!process.env.MONGODB_URI) {
-  throw new Error("MONGODB_URI environment variable is not set");
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL environment variable is not set");
 }
+
+neonConfig.webSocketConstructor = ws;
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const db = drizzle(pool);
 
 export async function connectDB() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI!, {
-      serverSelectionTimeoutMS: 5000,
-      retryWrites: true,
-    });
-    console.log("Connected to MongoDB");
+    const client = await pool.connect();
+    console.log("Connected to PostgreSQL");
+    client.release();
   } catch (error) {
-    console.error("MongoDB connection error:", error);
+    console.error("PostgreSQL connection error:", error);
     process.exit(1);
   }
 }
-
-mongoose.connection.on("error", (err) => {
-  console.error("MongoDB connection error:", err);
-});
-
-mongoose.connection.on("disconnected", () => {
-  console.warn("MongoDB disconnected. Attempting to reconnect...");
-});
-
-mongoose.connection.on("reconnected", () => {
-  console.log("MongoDB reconnected");
-});
-
-export { mongoose };

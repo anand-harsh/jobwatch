@@ -1,6 +1,7 @@
-import { User, JobApplication, type IUser, type IJobApplication, type InsertJob, type UpdateJob } from "@shared/schema";
+import { users, jobApplications, type User, type JobApplication, type InsertJob, type UpdateJob } from "@shared/schema";
 import bcrypt from "bcryptjs";
-import { Types } from "mongoose";
+import { db } from "./db";
+import { eq, and, desc, inArray } from "drizzle-orm";
 
 export interface UserWithMethods {
   id: string;
@@ -34,11 +35,11 @@ export interface IStorage {
   deleteJobs(jobIds: string[], userId: string): Promise<number>;
 }
 
-export class MongoStorage implements IStorage {
-  private addUserMethods(user: IUser): UserWithMethods {
+export class PostgresStorage implements IStorage {
+  private addUserMethods(user: User): UserWithMethods {
     const hashedPassword = user.password;
     return {
-      id: user._id.toString(),
+      id: user.id.toString(),
       username: user.username,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
@@ -48,9 +49,9 @@ export class MongoStorage implements IStorage {
     };
   }
 
-  private formatJob(job: IJobApplication): JobApplicationData {
+  private formatJob(job: JobApplication): JobApplicationData {
     return {
-      id: job._id.toString(),
+      id: job.id.toString(),
       company: job.company,
       role: job.role,
       dateApplied: job.dateApplied,
@@ -63,13 +64,17 @@ export class MongoStorage implements IStorage {
   }
 
   async getUser(id: string): Promise<UserWithMethods | null> {
-    if (!Types.ObjectId.isValid(id)) return null;
-    const user = await User.findById(id);
+    const userId = parseInt(id);
+    if (isNaN(userId)) return null;
+    
+    const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    const user = result[0];
     return user ? this.addUserMethods(user) : null;
   }
 
   async getUserByUsername(username: string): Promise<UserWithMethods | null> {
-    const user = await User.findOne({ username });
+    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    const user = result[0];
     return user ? this.addUserMethods(user) : null;
   }
 
@@ -77,59 +82,98 @@ export class MongoStorage implements IStorage {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = await User.create({
+    const result = await db.insert(users).values({
       username,
       password: hashedPassword,
-    });
+    }).returning();
 
-    return this.addUserMethods(user);
+    return this.addUserMethods(result[0]);
   }
 
   async getJobsByUserId(userId: string): Promise<JobApplicationData[]> {
-    if (!Types.ObjectId.isValid(userId)) return [];
-    const jobs = await JobApplication.find({ userId: new Types.ObjectId(userId) })
-      .sort({ createdAt: -1 });
+    const userIdNum = parseInt(userId);
+    if (isNaN(userIdNum)) return [];
+    
+    const jobs = await db.select()
+      .from(jobApplications)
+      .where(eq(jobApplications.userId, userIdNum))
+      .orderBy(desc(jobApplications.createdAt));
+    
     return jobs.map(job => this.formatJob(job));
   }
 
   async getJobById(jobId: string, userId: string): Promise<JobApplicationData | null> {
-    if (!Types.ObjectId.isValid(jobId) || !Types.ObjectId.isValid(userId)) return null;
-    const job = await JobApplication.findOne({ 
-      _id: new Types.ObjectId(jobId), 
-      userId: new Types.ObjectId(userId) 
-    });
+    const jobIdNum = parseInt(jobId);
+    const userIdNum = parseInt(userId);
+    if (isNaN(jobIdNum) || isNaN(userIdNum)) return null;
+    
+    const result = await db.select()
+      .from(jobApplications)
+      .where(
+        and(
+          eq(jobApplications.id, jobIdNum),
+          eq(jobApplications.userId, userIdNum)
+        )
+      )
+      .limit(1);
+    
+    const job = result[0];
     return job ? this.formatJob(job) : null;
   }
 
   async createJob(userId: string, jobData: InsertJob): Promise<JobApplicationData> {
-    const job = await JobApplication.create({
-      userId: new Types.ObjectId(userId),
+    const userIdNum = parseInt(userId);
+    
+    const result = await db.insert(jobApplications).values({
+      userId: userIdNum,
       ...jobData,
-    });
-    return this.formatJob(job);
+    }).returning();
+    
+    return this.formatJob(result[0]);
   }
 
   async updateJob(jobId: string, userId: string, updates: UpdateJob): Promise<JobApplicationData | null> {
-    if (!Types.ObjectId.isValid(jobId) || !Types.ObjectId.isValid(userId)) return null;
-    const job = await JobApplication.findOneAndUpdate(
-      { _id: new Types.ObjectId(jobId), userId: new Types.ObjectId(userId) },
-      { $set: updates },
-      { new: true }
-    );
+    const jobIdNum = parseInt(jobId);
+    const userIdNum = parseInt(userId);
+    if (isNaN(jobIdNum) || isNaN(userIdNum)) return null;
+    
+    const result = await db.update(jobApplications)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(jobApplications.id, jobIdNum),
+          eq(jobApplications.userId, userIdNum)
+        )
+      )
+      .returning();
+    
+    const job = result[0];
     return job ? this.formatJob(job) : null;
   }
 
   async deleteJobs(jobIds: string[], userId: string): Promise<number> {
-    if (!Types.ObjectId.isValid(userId)) return 0;
-    const validJobIds = jobIds.filter(id => Types.ObjectId.isValid(id)).map(id => new Types.ObjectId(id));
+    const userIdNum = parseInt(userId);
+    if (isNaN(userIdNum)) return 0;
+    
+    const validJobIds = jobIds
+      .map(id => parseInt(id))
+      .filter(id => !isNaN(id));
+    
     if (validJobIds.length === 0) return 0;
     
-    const result = await JobApplication.deleteMany({
-      _id: { $in: validJobIds },
-      userId: new Types.ObjectId(userId)
-    });
-    return result.deletedCount;
+    const result = await db.delete(jobApplications)
+      .where(
+        and(
+          inArray(jobApplications.id, validJobIds),
+          eq(jobApplications.userId, userIdNum)
+        )
+      );
+    
+    return result.rowCount ?? 0;
   }
 }
 
-export const storage = new MongoStorage();
+export const storage = new PostgresStorage();
